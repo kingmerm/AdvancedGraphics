@@ -22,6 +22,17 @@
   #include <GL/glut.h>
 #endif
 
+#define DEG_TO_RAD_CONV 0.017453293
+#define MOVEMENT_FACTOR 0.12
+
+
+// Global viewpoint/camera variables 
+GLdouble latitude, longitude;
+GLfloat eyeX, eyeY, eyeZ;
+GLfloat centerX, centerY, centerZ;
+GLfloat upX, upY, upZ;
+
+
 // Display list for coordinate axis 
 GLuint axisList;
 
@@ -41,13 +52,24 @@ double myRandom()
 void display()
 {
   glLoadIdentity();
-  gluLookAt(0.0, 100.0, 1000.0,
-            0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0);
+  calculateLookpoint();
+  gluLookAt(eyeX, eyeY, eyeZ,
+            centerX, centerY, centerZ,
+            upX, upY, upZ);
   // Clear the screen
   glClear(GL_COLOR_BUFFER_BIT);
   // If enabled, draw coordinate axis
   if(axisEnabled) glCallList(axisList);
+  /**
+  THIS QUAD WAS USED FOR TESTING KEY-MAPPINGS
+  glBegin(GL_QUADS);
+    glVertex3f(0.0,6.0,4.0);
+    glVertex3f(0.0,8.0,0.0);
+    glVertex3f(8.0, 6.0, 0.0);
+    glVertex3f(8.0, 3.0, 0.0);
+    glVertex3f(6.0,0.0,5.0);
+    glVertex3f(2.0,0.0,5.0);
+  glEnd();**/
   glutSwapBuffers();
 }
 
@@ -55,11 +77,49 @@ void display()
 
 void keyboard(unsigned char key, int x, int y)
 {
-  if(key == 27) exit(0);
-  printf("The key press was %i \n", key);
+ switch (key)
+ {
+    case 27:
+    exit(0);
+    break;
+    case 97:
+    eyeX += MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+    case 100:
+    eyeX -= MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+    case 119:
+    eyeZ += MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+    case 115:
+    eyeZ -= MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+    case 120:
+    eyeY -= MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+    case 122:
+    eyeY += MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
+ }
   glutPostRedisplay();
 }
 
+///////////////////////////////////////////////
+void calculateLookpoint() {
+  double deltaX = cos(DEG_TO_RAD_CONV*latitude)*sin(DEG_TO_RAD_CONV*longitude);
+  double deltaY = sin(DEG_TO_RAD_CONV*latitude);
+  double deltaZ = cos(DEG_TO_RAD_CONV*latitude)*cos(DEG_TO_RAD_CONV*longitude);
+
+  centerX = eyeX + deltaX;
+  centerY = eyeY + deltaY;
+  centerZ = eyeZ + deltaZ;
+}
 ///////////////////////////////////////////////
 
 void reshape(int width, int height)
@@ -95,6 +155,14 @@ void makeAxes() {
 ///////////////////////////////////////////////
 void initGraphics(int argc, char *argv[])
 {
+  eyeX = 3.0;
+  eyeY = 5.0;
+  eyeZ = -10.0;
+  upX = 0.0;
+  upY = 1.0;
+  upZ = 0.0;
+  latitude = 0.0;
+  longitude = 0.0;
   glutInit(&argc, argv);
   glutInitWindowSize(800, 600);
   glutInitWindowPosition(100, 100);
