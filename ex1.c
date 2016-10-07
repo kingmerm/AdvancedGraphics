@@ -24,6 +24,9 @@
 
 #define DEG_TO_RAD_CONV 0.017453293
 #define MOVEMENT_FACTOR 0.12
+#define INITIAL_VELOCITY 0
+#define PARTICLE_SIZE 10.0f
+#define GRAVITY_CONST 9.81
 
 
 // Global viewpoint/camera variables 
@@ -31,6 +34,9 @@ GLdouble latitude, longitude;
 GLfloat eyeX, eyeY, eyeZ;
 GLfloat centerX, centerY, centerZ;
 GLfloat upX, upY, upZ;
+GLfloat particleX0, particleY0, particleZ0;
+GLfloat particleXPos, particleYPos, particleZPos;
+GLfloat currentTime;
 
 
 // Display list for coordinate axis 
@@ -48,6 +54,22 @@ double myRandom()
 }
 
 ///////////////////////////////////////////////
+float calculateNewPosition(float t){
+    return (INITIAL_VELOCITY*t + 1/2*(GRAVITY_CONST)*t*t);
+}
+///////////////////////////////////////////////
+
+void makeParticle(){
+  glColor3f(0.0f, 25.0f, 50.0f);
+  glPointSize(PARTICLE_SIZE);
+  particleXPos = particleXPos + calculateNewPosition(currentTime);
+  particleYPos = particleYPos + calculateNewPosition(currentTime);
+  particleZPos = particleZPos + calculateNewPosition(currentTime);
+  currentTime += 0.5f;
+  glBegin(GL_POINTS);
+    glVertex3f(particleXPos, particleYPos, particleZPos);
+  glEnd();
+}
 
 void display()
 {
@@ -61,7 +83,7 @@ void display()
   // If enabled, draw coordinate axis
   if(axisEnabled) glCallList(axisList);
   /**
-  THIS QUAD WAS USED FOR TESTING KEY-MAPPINGS
+  THIS QUAD WAS USED FOR TESTING KEY-MAPPINGSw
   glBegin(GL_QUADS);
     glVertex3f(0.0,6.0,4.0);
     glVertex3f(0.0,8.0,0.0);
@@ -70,6 +92,7 @@ void display()
     glVertex3f(6.0,0.0,5.0);
     glVertex3f(2.0,0.0,5.0);
   glEnd();**/
+  makeParticle();
   glutSwapBuffers();
 }
 
@@ -155,6 +178,7 @@ void makeAxes() {
 ///////////////////////////////////////////////
 void initGraphics(int argc, char *argv[])
 {
+  /*INITIAL NAVIGATIONAL VARIABLES*/
   eyeX = 3.0;
   eyeY = 5.0;
   eyeZ = -10.0;
@@ -163,6 +187,13 @@ void initGraphics(int argc, char *argv[])
   upZ = 0.0;
   latitude = 0.0;
   longitude = 0.0;
+  /*************************/
+  /*INITIAL PARTICLE VARIABLES*/
+   particleX0 = 0.0f;
+   particleY0 = 0.0f;
+   particleZ0 = 0.0f;
+   currentTime = 0.0f; // initial t = 0
+  /****************************/
   glutInit(&argc, argv);
   glutInitWindowSize(800, 600);
   glutInitWindowPosition(100, 100);
@@ -184,3 +215,4 @@ int main(int argc, char *argv[])
   glEnable(GL_POINT_SMOOTH);
   glutMainLoop();
 }
+
