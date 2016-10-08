@@ -59,16 +59,16 @@ float calculateNewPosition(float t){
 }
 ///////////////////////////////////////////////
 
-void makeParticle(){
+void makeParticle(float t){
   glColor3f(0.0f, 25.0f, 50.0f);
   glPointSize(PARTICLE_SIZE);
-  particleXPos = particleXPos + calculateNewPosition(currentTime);
-  particleYPos = particleYPos + calculateNewPosition(currentTime);
-  particleZPos = particleZPos + calculateNewPosition(currentTime);
-  currentTime += 0.5f;
-  glBegin(GL_POINTS);
+  particleXPos = particleXPos + calculateNewPosition(t);
+  particleYPos = particleYPos + calculateNewPosition(t);
+  particleZPos = particleZPos + calculateNewPosition(t);
+  /*glBegin(GL_POINTS);
     glVertex3f(particleXPos, particleYPos, particleZPos);
   glEnd();
+  */
 }
 
 void display()
@@ -92,8 +92,15 @@ void display()
     glVertex3f(6.0,0.0,5.0);
     glVertex3f(2.0,0.0,5.0);
   glEnd();**/
-  makeParticle();
+  if (currentTime < 20.0){
+  glPointSize(PARTICLE_SIZE);
+  glBegin(GL_POINTS);
+  glVertex3f(particleXPos+currentTime, particleYPos+currentTime, particleZPos+currentTime);
+  glEnd();
   glutSwapBuffers();
+  glutPostRedisplay();
+  currentTime+=0.1f;
+  }
 }
 
 ///////////////////////////////////////////////
