@@ -136,6 +136,9 @@ void keyboard(unsigned char key, int x, int y)
     eyeY += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
+    case 32:
+    currentTime = 0;
+    break;
  }
   glutPostRedisplay();
 }
