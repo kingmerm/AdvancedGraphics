@@ -24,10 +24,13 @@
 
 #define DEG_TO_RAD_CONV 0.017453293
 #define MOVEMENT_FACTOR 0.12
-#define INITIAL_VELOCITY 0
+#define INITIAL_VELOCITY 1.5f
+#define MAXIMUM_DISTANCE 20.0f
 #define PARTICLE_SIZE 10.0f
-#define GRAVITY_CONST 9.81
+#define PARTICLE_LIFE 20.0f
+#define GRAVITY_CONST -15.0f
 
+float velocity = INITIAL_VELOCITY;
 
 // Global viewpoint/camera variables 
 GLdouble latitude, longitude;
@@ -54,23 +57,35 @@ double myRandom()
 }
 
 ///////////////////////////////////////////////
-float calculateNewPosition(float t){
-    return (INITIAL_VELOCITY*t + 1/2*(GRAVITY_CONST)*t*t);
+float calculateNewXPosition(float t/*, float velocity*/){
+    return (velocity*t);
+}
+float calculateNewYPosition(float t/*, float velocity*/){
+    return (velocity*t + 1/2*(GRAVITY_CONST)*t*t);
+}
+float calculateNewZPosition(float t/*, float velocity*/){
+    return (velocity*t);
+}
+float calculateNewVelocity(float distance){
+    return (distance/currentTime);
 }
 ///////////////////////////////////////////////
 
 void makeParticle(float t){
   glColor3f(0.0f, 25.0f, 50.0f);
   glPointSize(PARTICLE_SIZE);
-  particleXPos = particleXPos + calculateNewPosition(t);
-  particleYPos = particleYPos + calculateNewPosition(t);
-  particleZPos = particleZPos + calculateNewPosition(t);
+  particleXPos = particleXPos + calculateNewXPosition(t);
+  particleYPos = particleYPos + calculateNewYPosition(t);
+  particleZPos = particleZPos + calculateNewZPosition(t);
   /*glBegin(GL_POINTS);
     glVertex3f(particleXPos, particleYPos, particleZPos);
   glEnd();
   */
 }
-
+float deltaX = 0.0;
+float deltaY = 0.0;
+float deltaZ = 0.0;
+float distance = 0.0;
 void display()
 {
   glLoadIdentity();
@@ -92,14 +107,18 @@ void display()
     glVertex3f(6.0,0.0,5.0);
     glVertex3f(2.0,0.0,5.0);
   glEnd();**/
-  if (currentTime < 20.0){
+  deltaX = calculateNewXPosition(currentTime);
+  deltaY = calculateNewYPosition(currentTime);
+  deltaZ = calculateNewZPosition(currentTime);
+  printf("new X,Y,Z position: [%f,%f,%f] \n", deltaX,deltaY,deltaZ);
+  if (currentTime < PARTICLE_LIFE/* && delta < MAXIMUM_DISTANCE*/){
   glPointSize(PARTICLE_SIZE);
   glBegin(GL_POINTS);
-  glVertex3f(particleXPos+currentTime, particleYPos+currentTime, particleZPos+currentTime);
+  glVertex3f(particleXPos+deltaX, particleYPos +deltaY, particleZPos+deltaZ);
   glEnd();
+  currentTime+=0.1f;
   glutSwapBuffers();
   glutPostRedisplay();
-  currentTime+=0.1f;
   }
 }
 
