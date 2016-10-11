@@ -23,30 +23,35 @@
 #endif
 
 #define DEG_TO_RAD_CONV 0.017453293
-#define MOVEMENT_FACTOR 0.12
-#define INITIAL_VELOCITY 1.5f
+#define MOVEMENT_FACTOR 0.5
+#define INITIAL_VELOCITY 7.0f
 #define MAXIMUM_DISTANCE 20.0f
 #define PARTICLE_SIZE 10.0f
-#define PARTICLE_LIFE 20.0f
-#define GRAVITY_CONST -15.0f
-
-float velocity = INITIAL_VELOCITY;
+#define PARTICLE_LIFE 1000.0f
+#define GRAVITY_CONST -105.81f
 
 // Global viewpoint/camera variables 
 GLdouble latitude, longitude;
 GLfloat eyeX, eyeY, eyeZ;
 GLfloat centerX, centerY, centerZ;
 GLfloat upX, upY, upZ;
-GLfloat particleX0, particleY0, particleZ0;
-GLfloat particleXPos, particleYPos, particleZPos;
 GLfloat currentTime;
-
 
 // Display list for coordinate axis 
 GLuint axisList;
 
 int AXIS_SIZE= 200;
 int axisEnabled= 1;
+
+typedef struct
+{
+  GLfloat prevXPos, prevYPos, prevZPos;
+  GLfloat currentXPos, currentYPos, currentZPos;
+  GLfloat nextXPos, nextYPos, nextZPos;
+  GLfloat acceleration;
+  GLfloat velocity;
+  //Particle* next;
+} Particle;
 
 ///////////////////////////////////////////////
 
@@ -57,14 +62,14 @@ double myRandom()
 }
 
 ///////////////////////////////////////////////
-float calculateNewXPosition(float t/*, float velocity*/){
-    return (velocity*t);
+void calculateNewXPosition(Particle* p, float t){
+    p->nextXPos = (p->currentXPos + p->velocity*(currentTime-t));
 }
-float calculateNewYPosition(float t/*, float velocity*/){
-    return (velocity*t + 1/2*(GRAVITY_CONST)*t*t);
+void calculateNewYPosition(Particle* p, float t){
+    p->nextYPos = p->currentYPos - p->prevYPos + (1/2*(GRAVITY_CONST)*pow(currentTime-t,2));
 }
-float calculateNewZPosition(float t/*, float velocity*/){
-    return (velocity*t);
+void calculateNewZPosition(Particle* p, float t){
+    p->nextZPos = (p->currentZPos + p->velocity*(currentTime-t));;
 }
 float calculateNewVelocity(float distance){
     return (distance/currentTime);
@@ -72,16 +77,18 @@ float calculateNewVelocity(float distance){
 ///////////////////////////////////////////////
 
 void makeParticle(float t){
+  
   glColor3f(0.0f, 25.0f, 50.0f);
   glPointSize(PARTICLE_SIZE);
   particleXPos = particleXPos + calculateNewXPosition(t);
   particleYPos = particleYPos + calculateNewYPosition(t);
   particleZPos = particleZPos + calculateNewZPosition(t);
-  /*glBegin(GL_POINTS);
+  glBegin(GL_POINTS);
     glVertex3f(particleXPos, particleYPos, particleZPos);
   glEnd();
-  */
+  
 }
+
 float deltaX = 0.0;
 float deltaY = 0.0;
 float deltaZ = 0.0;
@@ -107,19 +114,19 @@ void display()
     glVertex3f(6.0,0.0,5.0);
     glVertex3f(2.0,0.0,5.0);
   glEnd();**/
-  deltaX = calculateNewXPosition(currentTime);
-  deltaY = calculateNewYPosition(currentTime);
-  deltaZ = calculateNewZPosition(currentTime);
-  printf("new X,Y,Z position: [%f,%f,%f] \n", deltaX,deltaY,deltaZ);
-  if (currentTime < PARTICLE_LIFE/* && delta < MAXIMUM_DISTANCE*/){
+
+  calculateNewXPosition(particle,0.1);
+  calculateNewYPosition(particle,0.1);
+  calculateNewZPosition(particle,0.1);
+  if (currentTime < PARTICLE_LIFE){/* && delta < MAXIMUM_DISTANCE){*/
   glPointSize(PARTICLE_SIZE);
   glBegin(GL_POINTS);
-  glVertex3f(particleXPos+deltaX, particleYPos +deltaY, particleZPos+deltaZ);
+  glVertex3f(particle->currentXPos,particle->currentYPos, particle->currentZPos);
   glEnd();
   currentTime+=0.1f;
+  }
   glutSwapBuffers();
   glutPostRedisplay();
-  }
 }
 
 ///////////////////////////////////////////////
@@ -132,27 +139,27 @@ void keyboard(unsigned char key, int x, int y)
     exit(0);
     break;
     case 97:
-    eyeX += MOVEMENT_FACTOR;
-    calculateLookpoint();
-    break;
-    case 100:
     eyeX -= MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
-    case 119:
-    eyeZ += MOVEMENT_FACTOR;
+    case 100:
+    eyeX += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
-    case 115:
+    case 119:
     eyeZ -= MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
+    case 115:
+    eyeZ += MOVEMENT_FACTOR;
+    calculateLookpoint();
+    break;
     case 120:
-    eyeY -= MOVEMENT_FACTOR;
+    eyeY += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 122:
-    eyeY += MOVEMENT_FACTOR;
+    eyeY -= MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 32:
@@ -208,19 +215,29 @@ void makeAxes() {
 void initGraphics(int argc, char *argv[])
 {
   /*INITIAL NAVIGATIONAL VARIABLES*/
-  eyeX = 3.0;
-  eyeY = 5.0;
-  eyeZ = -10.0;
+  eyeX = 30.0;
+  eyeY = 50.0;
+  eyeZ = -100.0;
   upX = 0.0;
-  upY = 1.0;
+  upY = -1.0;
   upZ = 0.0;
   latitude = 0.0;
   longitude = 0.0;
   /*************************/
   /*INITIAL PARTICLE VARIABLES*/
-   particleX0 = 0.0f;
-   particleY0 = 0.0f;
-   particleZ0 = 0.0f;
+   Particle* particle = (Particle*)malloc(sizeof(Particle));
+   particle->prevXPos = 0.0f;
+   particle->prevYPos = 0.0f;
+   particle->prevZPos = 0.0f;
+   particle->currentXPos = 0.0f;
+   particle->currentYPos = 0.0f;
+   particle->currentZPos = 0.0f;
+   particle->nextXPos = 0.0f;
+   particle->nextYPos = 0.0f;
+   particle->nextZPos = 0.0f;
+   particle->velocity = 1.5f;
+   particle->acceleration = -9.81f;
+   //particle->next = NULL;
    currentTime = 0.0f; // initial t = 0
   /****************************/
   glutInit(&argc, argv);
