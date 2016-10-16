@@ -23,13 +23,14 @@
 #endif
 
 #define DEG_TO_RAD_CONV 0.017453293f
-#define TIME_STEP 0.0001f
+#define TIME_STEP .001f
 #define MOVEMENT_FACTOR 2.5f;
 #define INITIAL_VELOCITY 7.0f
 #define MAXIMUM_DISTANCE 20.0f
 #define PARTICLE_SIZE 10.0f
-#define PARTICLE_LIFE 10.0f
-#define GRAVITY_CONST 9.81f
+#define PARTICLE_NUMBER 1000
+#define PARTICLE_LIFE .1f
+#define GRAVITY_CONST 5.81f
 
 // Global viewpoint/camera variables 
 GLfloat latitude, longitude;
@@ -52,6 +53,14 @@ typedef struct
 
 typedef struct
 {
+	GLdouble R;
+	GLdouble G;
+	GLdouble B;
+	GLdouble A;
+}Color;
+
+typedef struct
+{
   //GLfloat prevXPos, prevYPos, prevZPos;
   Coord* prevPos;
   Coord* currentPos;
@@ -59,10 +68,18 @@ typedef struct
   Coord* velocity;
   Coord* acceleration;
   GLfloat currentTime;
-  //Particle* next;
-} Particle;
-Particle* particleSet[10];
+  Color* color;
+  struct Particle* next;
+}Particle;
 
+typedef struct
+{
+	Particle* particleSet[PARTICLE_NUMBER];
+	int particlesPerSec;
+	int currentParticles;
+} Emitter;
+
+Emitter* emitter;
 ///////////////////////////////////////////////
 
 double myRandom()
@@ -73,21 +90,26 @@ double myRandom()
 
 ///////////////////////////////////////////////
 void calculateNewXPosition(Particle* p, GLfloat dt){
-    p->nextPos->x = (p->currentPos->x + p->velocity->x*(dt));
+    p->nextPos->x = p->velocity->x*(dt);
 	p->prevPos->x = p->currentPos->x;
-	p->currentPos->x = p->nextPos->x;
+	p->currentPos->x += p->nextPos->x;
 	p->nextPos->x = 0.0f;
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
+	if (p->currentPos->y > 200) {
+		p->velocity->y *= -1.0f;
+		p->velocity->y += 0.1;
+		//glColor3f(p->color->R, p->color->G, p->color->B);
+	}
     p->nextPos->y = p->velocity->y + (float)(1/2*(p->acceleration->y)*pow(dt,2));
 	p->prevPos->y = p->currentPos->y;
-	p->currentPos->y = p->nextPos->y;
+	p->currentPos->y += p->nextPos->y;
 	p->nextPos->y = 0.0f;
 }
 void calculateNewZPosition(Particle* p, GLfloat dt){
-	p->nextPos->z = (p->currentPos->z + p->velocity->z*(dt));
+	p->nextPos->z = p->velocity->z*(dt);
 	p->prevPos->z = p->currentPos->z;
-	p->currentPos->z = p->nextPos->z;
+	p->currentPos->z += p->nextPos->z;
 	p->nextPos->z = 0.0f;
 }
 void calculateNewXVelocity(Particle* p, GLfloat dt) {
@@ -99,18 +121,25 @@ void calculateNewYVelocity(Particle* p, GLfloat dt) {
 void calculateNewZVelocity(Particle* p, GLfloat dt) {
 	p->velocity->y += p->acceleration->y * (dt);
 }
-void resetParticle(Particle* p) {
-	p->prevPos->x = .0f;
-	p->prevPos->y = .0f;
-	p->prevPos->z = .0f;
-	p->currentPos->x = .0f;
-	p->currentPos->y = .0f;
-	p->currentPos->z = .0f;
-	p->nextPos->x = .0f;
-	p->nextPos->y = .0f;
-	p->nextPos->z = .0f;
-	p->velocity->y = .0f;
-	p->currentTime = .0f;
+void initParticle(Particle* particle) {
+	particle->prevPos = (Coord*)malloc(sizeof(Coord));
+	particle->currentPos = (Coord*)malloc(sizeof(Coord));
+	particle->nextPos = (Coord*)malloc(sizeof(Coord));
+	particle->velocity = (Coord*)malloc(sizeof(Coord));
+	particle->acceleration = (Coord*)malloc(sizeof(Coord));
+	particle->color = (Color*)malloc(sizeof(Color));
+	particle->velocity->x = 17.5f;
+	particle->velocity->y = .0f;
+	particle->velocity->z = 17.5f;
+	particle->acceleration->x = .0f;
+	particle->acceleration->y = GRAVITY_CONST;
+	particle->acceleration->z = .0f;
+	particle->currentTime = .0f;
+	particle->next = NULL;
+	particle->color->R = (GLdouble)myRandom()*1.0f;
+	particle->color->G = (GLdouble)myRandom()*1.0f;
+	particle->color->B = (GLdouble)myRandom()*1.0f;
+	particle->color->A = 1.0f;
 
 }
 ///////////////////////////////////////////////
@@ -124,21 +153,46 @@ void calculateLookpoint() {
 	centerZ = eyeZ + deltaZ;
 }
 ///////////////////////////////////////////////
-/*
-void makeParticle(Particle* particle){
-  
-  glColor3f(0.0f, 25.0f, 50.0f);
-  glPointSize(PARTICLE_SIZE);
-  particleXPos = particleXPos + calculateNewXPosition(t);
-  particleYPos = particleYPos + calculateNewYPosition(t);
-  particleZPos = particleZPos + calculateNewZPosition(t);
-  glBegin(GL_POINTS);
-    glVertex3f(particleXPos, particleYPos, particleZPos);
-  glEnd();
-  
+void calculateNextPositions(Particle* particle){
+	//Particle* particle = emitter->particleSet[0]; //loop through current particles
+	//while (particle != NULL) {
+	calculateNewXVelocity(particle, particle->currentTime - TIME_STEP);
+	calculateNewYVelocity(particle, particle->currentTime - TIME_STEP);
+	calculateNewZVelocity(particle, particle->currentTime - TIME_STEP);
+	calculateNewXPosition(particle, particle->currentTime - TIME_STEP);
+	calculateNewYPosition(particle, particle->currentTime - TIME_STEP);
+	calculateNewZPosition(particle, particle->currentTime - TIME_STEP);
+	//	particle = particle->next;
+	//}
 }
-*/
-int i = 0;
+void drawParticles() {
+	Particle* particle = emitter->particleSet[0];
+	Particle* tmp = (Particle*)malloc(sizeof(Particle));
+	memcpy(tmp,particle,sizeof(Particle));
+	/*
+	if (particle->next == NULL) {
+		glPointSize(PARTICLE_SIZE);
+		glBegin(GL_POINTS);
+		glVertex3f(particle->currentPos->x, particle->currentPos->y, particle->currentPos->z);
+		glEnd();
+	}
+	*/
+	glPointSize(PARTICLE_SIZE);
+	int i = 0;
+	while (tmp != NULL) {
+		//glColor3f(particle->color->R, particle->color->G, particle->color->B);
+		calculateNextPositions(tmp);
+		glBegin(GL_POINTS);
+		glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
+		glEnd();
+		tmp->currentTime += TIME_STEP;
+		emitter->particleSet[i] = tmp;
+		tmp = tmp->next;
+		i++;
+	}
+	glutSwapBuffers();
+}
+int i;
 void display()
 {
   glLoadIdentity();
@@ -149,24 +203,66 @@ void display()
   // Clear the screen
   glClear(GL_COLOR_BUFFER_BIT);
   // If enabled, draw coordinate axis
+  glBegin(GL_LINES);
+  glVertex3f(0.0, 200, 0.0);
+  glVertex3f(2000, 200, 0.0);
+  glEnd();
   if(axisEnabled) glCallList(axisList);
-
-  if (particleSet[i]->currentTime < PARTICLE_LIFE) {
-	glPointSize(PARTICLE_SIZE);
-	calculateNewXVelocity(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	calculateNewYVelocity(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	calculateNewZVelocity(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	calculateNewXPosition(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	calculateNewYPosition(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	calculateNewZPosition(particleSet[i], particleSet[i]->currentTime - TIME_STEP);
-	printf("[X,Y] = [%f,%f]\n", particleSet[i]->currentPos->x, particleSet[i]->currentPos->y);
-	glBegin(GL_POINTS);
-	glVertex3f(particleSet[i]->currentPos->x, particleSet[i]->currentPos->y, particleSet[i]->currentPos->z);
+  	glBegin(GL_LINE);
+	glVertex2f(0, 200);
+	glVertex2f(1000, 200);
 	glEnd();
-	particleSet[i]->currentTime += TIME_STEP;
-	glutSwapBuffers();
+	glPushMatrix();
+	/*
+	for (i = 1; i < PARTICLE_NUMBER; i++) {
+		if (emitter->particleSet[i-1]->currentTime < PARTICLE_LIFE) {
+			glPointSize(PARTICLE_SIZE);
+			calculateNextPosition(emitter->particleSet[i-1]);
+			glBegin(GL_POINTS);
+			glVertex3f(emitter->particleSet[i-1]->currentPos->x, emitter->particleSet[i-1]->currentPos->y, emitter->particleSet[i-1]->currentPos->z);
+			glEnd();
+			emitter->particleSet[i]->currentTime += TIME_STEP;
+		}//if
+		else {
+			glBegin(GL_POINTS);
+			glVertex3f(emitter->particleSet[i]->currentPos->x, emitter->particleSet[i]->currentPos->y, emitter->particleSet[i]->currentPos->z);
+			glEnd();
+			emitter->particleSet[i]->currentTime += TIME_STEP;
+		}
+	}
+	*/
+	/*
+	for (i = 0; i < PARTICLE_NUMBER; i++) {
+		glPointSize(PARTICLE_SIZE);
+		Particle* particle = (Particle*)malloc(sizeof(Particle));
+		if (i != 0) {
+			particle = emitter->particleSet[i - 1]->next;
+			initParticle(particle);
+		}
+		else
+		{
+		    emitter->particleSet[i] = particle;
+			initParticle(particle);
+		}
+	}
+
+	int j = 0;
+	while (emitter->particleSet[j]->next != NULL){
+		calculateNextPosition();
+		j++;
+	}
+	*/
+	if (emitter->particleSet[emitter->currentParticles-1]->currentTime >= PARTICLE_LIFE && emitter->currentParticles+emitter->particlesPerSec < 100) {
+		//Particle* particle = (Particle*)malloc(sizeof(Particle));
+		//initParticle(particle);
+		emitter->particleSet[emitter->currentParticles-1]->next = (Particle*)malloc(sizeof(Particle));
+		//memcpy(emitter->particleSet[emitter->currentParticles]->next,particle, sizeof(Particle*));
+		initParticle(emitter->particleSet[emitter->currentParticles-1]->next);
+		emitter->currentParticles += 1;
+		printf("New Particle Drawn, Now there are %d Particles here! \n", emitter->currentParticles);
+	}
+	drawParticles();
 	glutPostRedisplay();
-  }//if
 }
 
 ///////////////////////////////////////////////
@@ -178,12 +274,14 @@ void keyboard(unsigned char key, int x, int y)
     case 27:
     exit(0);
     break;
+	/*
     case 97:
-    eyeX -= MOVEMENT_FACTOR;
+    glTranslatef(-2.5f,0,0);
     calculateLookpoint();
     break;
     case 100:
-    eyeX += MOVEMENT_FACTOR;
+    //eyeX += MOVEMENT_FACTOR;
+    glTranslatef(2.5f, 0, 0);
     calculateLookpoint();
     break;
     case 119:
@@ -202,8 +300,9 @@ void keyboard(unsigned char key, int x, int y)
     eyeZ += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
+	*/
     case 32:
-    resetParticle(particleSet[0]);
+    initParticle(emitter->particleSet[0]);
     break;
  }
   glutPostRedisplay();
@@ -246,32 +345,30 @@ void initGraphics(int argc, char *argv[])
 {
   /*INITIAL NAVIGATIONAL VARIABLES*/
   eyeX = 50.0;
-  eyeY = 5.0;
-  eyeZ = -500.0;
+  eyeY = -20.0;
+  eyeZ = -700.0;
   upX = 0.0;
   upY = -1.0;
   upZ = 0.0;
   latitude = 0.0;
   longitude = 0.0;
-  /*************************/
+  /******************************/
+  /*INITIAL EMITTER VARIABLES*/
+  emitter = (Emitter*)malloc(sizeof(Emitter));
+  emitter->particlesPerSec = 1;
+  /**************************/
   /*INITIAL PARTICLE VARIABLES*/
-  int i;
+  /*
   for (i = 0; i < 100; i++) {
 	  Particle* particle = (Particle*)malloc(sizeof(Particle));
-	  particle->prevPos = (Coord*)malloc(sizeof(Coord));
-	  particle->currentPos = (Coord*)malloc(sizeof(Coord));
-	  particle->nextPos = (Coord*)malloc(sizeof(Coord));
-	  particle->velocity = (Coord*)malloc(sizeof(Coord));
-	  particle->acceleration = (Coord*)malloc(sizeof(Coord));
-	  particle->velocity->x = 7.5f;
-	  particle->velocity->y = .0f;
-	  particle->velocity->z = 7.5f;
-	  particle->acceleration->x = .0f;
-	  particle->acceleration->y = GRAVITY_CONST;
-	  particle->acceleration->z = .0f;
-	  particle->currentTime = .0f;
-	  particleSet[i] = particle;
+	  initParticle(particle);
+	  emitter->particleSet[i] = particle;
   }
+  */
+  Particle* particle = (Particle*)malloc(sizeof(Particle));
+  initParticle(particle);
+  emitter->particleSet[0] = particle;
+  emitter->currentParticles = 1;
   /****************************/
   glutInit(&argc, argv);
   glutInitWindowSize(800, 600);
