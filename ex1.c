@@ -27,9 +27,10 @@
 #define MOVEMENT_FACTOR 2.5f;
 #define INITIAL_VELOCITY 7.0f
 #define MAXIMUM_DISTANCE 20.0f
-#define PARTICLE_SIZE 10.0f
-#define PARTICLE_NUMBER 1000
-#define PARTICLE_LIFE .1f
+#define PARTICLE_SIZE 1.0f
+#define PARTICLE_NUMBER 60
+#define PARTICLE_LIFE .01f
+#define EMITTER_NUMBER 3
 #define GRAVITY_CONST 5.81f
 
 // Global viewpoint/camera variables 
@@ -77,9 +78,15 @@ typedef struct
 	Particle* particleSet[PARTICLE_NUMBER];
 	int particlesPerSec;
 	int currentParticles;
+	Coord* position;
 } Emitter;
 
 Emitter* emitter;
+
+typedef struct
+{
+	Emitter* emitterSet[EMITTER_NUMBER];
+}ParticleSystem;
 ///////////////////////////////////////////////
 
 double myRandom()
@@ -90,15 +97,19 @@ double myRandom()
 
 ///////////////////////////////////////////////
 void calculateNewXPosition(Particle* p, GLfloat dt){
+	if (p->currentPos->x > 200 || p->currentPos->x < -200) {
+		p->velocity->x *= -1.0f;
+	}
     p->nextPos->x = p->velocity->x*(dt);
 	p->prevPos->x = p->currentPos->x;
 	p->currentPos->x += p->nextPos->x;
 	p->nextPos->x = 0.0f;
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
-	if (p->currentPos->y > 200) {
+	if (p->currentPos->y > 200.0f || p->currentPos->y < -200) {
 		p->velocity->y *= -1.0f;
-		p->velocity->y += 0.1;
+		p->acceleration->y = 0.001;
+		//p->velocity->y += 0.1;
 		//glColor3f(p->color->R, p->color->G, p->color->B);
 	}
     p->nextPos->y = p->velocity->y + (float)(1/2*(p->acceleration->y)*pow(dt,2));
@@ -182,8 +193,10 @@ void drawParticles() {
 	while (tmp != NULL) {
 		//glColor3f(particle->color->R, particle->color->G, particle->color->B);
 		calculateNextPositions(tmp);
-		glBegin(GL_POINTS);
-		glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
+		glColor4f(1.0f, 0.0f, 1.0f, tmp->color->A - TIME_STEP);
+		glBegin(GL_LINES);
+		glVertex2f(tmp->prevPos->x,tmp->prevPos->y);
+		glVertex2f(tmp->currentPos->x, tmp->currentPos->y);/* , tmp->currentPos->z);*/
 		glEnd();
 		tmp->currentTime += TIME_STEP;
 		emitter->particleSet[i] = tmp;
@@ -208,51 +221,13 @@ void display()
   glVertex3f(2000, 200, 0.0);
   glEnd();
   if(axisEnabled) glCallList(axisList);
+  /*THIS LINE IS TO CHECK COLLISIONS WITH Y = 200*/
   	glBegin(GL_LINE);
 	glVertex2f(0, 200);
 	glVertex2f(1000, 200);
 	glEnd();
-	glPushMatrix();
-	/*
-	for (i = 1; i < PARTICLE_NUMBER; i++) {
-		if (emitter->particleSet[i-1]->currentTime < PARTICLE_LIFE) {
-			glPointSize(PARTICLE_SIZE);
-			calculateNextPosition(emitter->particleSet[i-1]);
-			glBegin(GL_POINTS);
-			glVertex3f(emitter->particleSet[i-1]->currentPos->x, emitter->particleSet[i-1]->currentPos->y, emitter->particleSet[i-1]->currentPos->z);
-			glEnd();
-			emitter->particleSet[i]->currentTime += TIME_STEP;
-		}//if
-		else {
-			glBegin(GL_POINTS);
-			glVertex3f(emitter->particleSet[i]->currentPos->x, emitter->particleSet[i]->currentPos->y, emitter->particleSet[i]->currentPos->z);
-			glEnd();
-			emitter->particleSet[i]->currentTime += TIME_STEP;
-		}
-	}
-	*/
-	/*
-	for (i = 0; i < PARTICLE_NUMBER; i++) {
-		glPointSize(PARTICLE_SIZE);
-		Particle* particle = (Particle*)malloc(sizeof(Particle));
-		if (i != 0) {
-			particle = emitter->particleSet[i - 1]->next;
-			initParticle(particle);
-		}
-		else
-		{
-		    emitter->particleSet[i] = particle;
-			initParticle(particle);
-		}
-	}
-
-	int j = 0;
-	while (emitter->particleSet[j]->next != NULL){
-		calculateNextPosition();
-		j++;
-	}
-	*/
-	if (emitter->particleSet[emitter->currentParticles-1]->currentTime >= PARTICLE_LIFE && emitter->currentParticles+emitter->particlesPerSec < 100) {
+	//glPushMatrix();
+	if (emitter->currentParticles + emitter->particlesPerSec < PARTICLE_NUMBER && emitter->particleSet[emitter->currentParticles - 1]->currentTime >= PARTICLE_LIFE) {
 		//Particle* particle = (Particle*)malloc(sizeof(Particle));
 		//initParticle(particle);
 		emitter->particleSet[emitter->currentParticles-1]->next = (Particle*)malloc(sizeof(Particle));
@@ -355,7 +330,11 @@ void initGraphics(int argc, char *argv[])
   /******************************/
   /*INITIAL EMITTER VARIABLES*/
   emitter = (Emitter*)malloc(sizeof(Emitter));
+  emitter->position = (Coord*)malloc(sizeof(Coord));
   emitter->particlesPerSec = 1;
+  emitter->position->x = 50.0f;
+  emitter->position->y = 50.0f;
+  emitter->position->z = 50.0f;
   /**************************/
   /*INITIAL PARTICLE VARIABLES*/
   /*
