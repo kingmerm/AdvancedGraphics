@@ -23,15 +23,15 @@
 #endif
 
 #define DEG_TO_RAD_CONV 0.017453293f
-#define TIME_STEP .001f
+#define TIME_STEP .0001f
 #define MOVEMENT_FACTOR 2.5f;
 #define INITIAL_VELOCITY 7.0f
 #define MAXIMUM_DISTANCE 20.0f
-#define PARTICLE_SIZE 1.0f
-#define PARTICLE_NUMBER 60
-#define PARTICLE_LIFE .01f
+#define PARTICLE_SIZE 5.0f
+#define PARTICLE_NUMBER 600
+#define PARTICLE_LIFE .10f
 #define EMITTER_NUMBER 3
-#define GRAVITY_CONST 5.81f
+#define GRAVITY_CONST -1.81f
 
 // Global viewpoint/camera variables 
 GLfloat latitude, longitude;
@@ -97,8 +97,12 @@ double myRandom()
 
 ///////////////////////////////////////////////
 void calculateNewXPosition(Particle* p, GLfloat dt){
-	if (p->currentPos->x > 200 || p->currentPos->x < -200) {
-		p->velocity->x *= -1.0f;
+	if (p->currentPos->y < -100.0f) {
+		p->velocity->x -= 0.0001f;
+    if (p->velocity->x < 0.0f)
+    {
+        p->velocity->x *= 0.1;
+    }
 	}
     p->nextPos->x = p->velocity->x*(dt);
 	p->prevPos->x = p->currentPos->x;
@@ -106,9 +110,10 @@ void calculateNewXPosition(Particle* p, GLfloat dt){
 	p->nextPos->x = 0.0f;
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
-	if (p->currentPos->y > 200.0f || p->currentPos->y < -200) {
-		p->velocity->y *= -1.0f;
-		p->acceleration->y = 0.001;
+	if (p->currentPos->y < -100.0f) {
+		p->velocity->y *= -.10f;
+		p->acceleration->y += 0.1;
+
 		//p->velocity->y += 0.1;
 		//glColor3f(p->color->R, p->color->G, p->color->B);
 	}
@@ -139,9 +144,9 @@ void initParticle(Particle* particle) {
 	particle->velocity = (Coord*)malloc(sizeof(Coord));
 	particle->acceleration = (Coord*)malloc(sizeof(Coord));
 	particle->color = (Color*)malloc(sizeof(Color));
-	particle->velocity->x = 17.5f;
-	particle->velocity->y = .0f;
-	particle->velocity->z = 17.5f;
+	particle->velocity->x = 12.75f*myRandom();
+	particle->velocity->y = 5.0f;
+	particle->velocity->z = 1.75f;
 	particle->acceleration->x = .0f;
 	particle->acceleration->y = GRAVITY_CONST;
 	particle->acceleration->z = .0f;
@@ -194,8 +199,7 @@ void drawParticles() {
 		//glColor3f(particle->color->R, particle->color->G, particle->color->B);
 		calculateNextPositions(tmp);
 		glColor4f(1.0f, 0.0f, 1.0f, tmp->color->A - TIME_STEP);
-		glBegin(GL_LINES);
-		glVertex2f(tmp->prevPos->x,tmp->prevPos->y);
+		glBegin(GL_POINTS);
 		glVertex2f(tmp->currentPos->x, tmp->currentPos->y);/* , tmp->currentPos->z);*/
 		glEnd();
 		tmp->currentTime += TIME_STEP;
@@ -216,16 +220,13 @@ void display()
   // Clear the screen
   glClear(GL_COLOR_BUFFER_BIT);
   // If enabled, draw coordinate axis
-  glBegin(GL_LINES);
-  glVertex3f(0.0, 200, 0.0);
-  glVertex3f(2000, 200, 0.0);
-  glEnd();
   if(axisEnabled) glCallList(axisList);
-  /*THIS LINE IS TO CHECK COLLISIONS WITH Y = 200*/
+  /*THIS LINE IS TO CHECK COLLISIONS WITH Y = 200
   	glBegin(GL_LINE);
 	glVertex2f(0, 200);
 	glVertex2f(1000, 200);
 	glEnd();
+	*/
 	//glPushMatrix();
 	if (emitter->currentParticles + emitter->particlesPerSec < PARTICLE_NUMBER && emitter->particleSet[emitter->currentParticles - 1]->currentTime >= PARTICLE_LIFE) {
 		//Particle* particle = (Particle*)malloc(sizeof(Particle));
@@ -323,7 +324,7 @@ void initGraphics(int argc, char *argv[])
   eyeY = -20.0;
   eyeZ = -700.0;
   upX = 0.0;
-  upY = -1.0;
+  upY = 1.0;
   upZ = 0.0;
   latitude = 0.0;
   longitude = 0.0;
