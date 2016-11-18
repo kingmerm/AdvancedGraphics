@@ -23,22 +23,23 @@
 #endif
 
 #define DEG_TO_RAD_CONV 0.017453293f
-#define TIME_STEP .0001f
+#define TIME_STEP .01f
 #define MOVEMENT_FACTOR 2.5f;
 #define INITIAL_VELOCITY 7.0f
 #define MAXIMUM_DISTANCE 20.0f
-#define PARTICLE_SIZE 5.0f
-#define PARTICLE_NUMBER 600
-#define PARTICLE_LIFE .10f
+#define PARTICLE_SIZE 1.0f
+#define PARTICLE_NUMBER 30000
+#define PARTICLE_LIFE 10.0f
 #define EMITTER_NUMBER 3
-#define GRAVITY_CONST -1.81f
+#define GRAVITY_CONST -9.81f
 
 // Global viewpoint/camera variables 
 GLfloat latitude, longitude;
 GLfloat eyeX, eyeY, eyeZ;
 GLfloat centerX, centerY, centerZ;
 GLfloat upX, upY, upZ;
-
+GLfloat xRotation, yRotation = 0.0;
+GLint mouseX, mouseY;
 // Display list for coordinate axis 
 GLuint axisList;
 
@@ -97,12 +98,8 @@ double myRandom()
 
 ///////////////////////////////////////////////
 void calculateNewXPosition(Particle* p, GLfloat dt){
-	if (p->currentPos->y < -100.0f) {
-		p->velocity->x -= 0.0001f;
-    if (p->velocity->x < 0.0f)
-    {
-        p->velocity->x *= 0.1;
-    }
+	if (p->currentPos->x > 10.0f || p->currentPos->x < -10.0f) {
+		p->velocity->x *= -0.99f;
 	}
     p->nextPos->x = p->velocity->x*(dt);
 	p->prevPos->x = p->currentPos->x;
@@ -110,9 +107,9 @@ void calculateNewXPosition(Particle* p, GLfloat dt){
 	p->nextPos->x = 0.0f;
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
-	if (p->currentPos->y < -100.0f) {
-		p->velocity->y *= -.10f;
-		p->acceleration->y += 0.1;
+	if (p->currentPos->y > -10.0) {
+		p->velocity->y *= -.05f;
+		//p->acceleration->y += 0.05;
 
 		//p->velocity->y += 0.1;
 		//glColor3f(p->color->R, p->color->G, p->color->B);
@@ -123,6 +120,9 @@ void calculateNewYPosition(Particle* p, GLfloat dt){
 	p->nextPos->y = 0.0f;
 }
 void calculateNewZPosition(Particle* p, GLfloat dt){
+	if (p->currentPos->z > 10.0f || p->currentPos->z < -10.0f) {
+		p->velocity->z *= -0.99f;
+	}
 	p->nextPos->z = p->velocity->z*(dt);
 	p->prevPos->z = p->currentPos->z;
 	p->currentPos->z += p->nextPos->z;
@@ -145,8 +145,8 @@ void initParticle(Particle* particle) {
 	particle->acceleration = (Coord*)malloc(sizeof(Coord));
 	particle->color = (Color*)malloc(sizeof(Color));
 	particle->velocity->x = 12.75f*myRandom();
-	particle->velocity->y = 5.0f;
-	particle->velocity->z = 1.75f;
+	particle->velocity->y = 0.0f;
+	particle->velocity->z = 15.75f*myRandom();
 	particle->acceleration->x = .0f;
 	particle->acceleration->y = GRAVITY_CONST;
 	particle->acceleration->z = .0f;
@@ -184,13 +184,13 @@ void calculateNextPositions(Particle* particle){
 void drawParticles() {
 	Particle* particle = emitter->particleSet[0];
 	Particle* tmp = (Particle*)malloc(sizeof(Particle));
-	memcpy(tmp,particle,sizeof(Particle));
+	memcpy(tmp, particle, sizeof(Particle));
 	/*
 	if (particle->next == NULL) {
-		glPointSize(PARTICLE_SIZE);
-		glBegin(GL_POINTS);
-		glVertex3f(particle->currentPos->x, particle->currentPos->y, particle->currentPos->z);
-		glEnd();
+	glPointSize(PARTICLE_SIZE);
+	glBegin(GL_POINTS);
+	glVertex3f(particle->currentPos->x, particle->currentPos->y, particle->currentPos->z);
+	glEnd();
 	}
 	*/
 	glPointSize(PARTICLE_SIZE);
@@ -198,16 +198,39 @@ void drawParticles() {
 	while (tmp != NULL) {
 		//glColor3f(particle->color->R, particle->color->G, particle->color->B);
 		calculateNextPositions(tmp);
-		glColor4f(1.0f, 0.0f, 1.0f, tmp->color->A - TIME_STEP);
 		glBegin(GL_POINTS);
-		glVertex2f(tmp->currentPos->x, tmp->currentPos->y);/* , tmp->currentPos->z);*/
+		glColor4f(tmp->color->R, 0.0f, 1.0f, tmp->color->A);
+		glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
 		glEnd();
 		tmp->currentTime += TIME_STEP;
+		tmp->color->A -= TIME_STEP;
 		emitter->particleSet[i] = tmp;
 		tmp = tmp->next;
 		i++;
 	}
 	glutSwapBuffers();
+}
+//////////////////////////////////////////////
+void mouseMotion(int x, int y) {
+	// Called when mouse moves
+	xRotation += (y - mouseY);	mouseY = y;
+	yRotation += (x - mouseX);	mouseX = x;
+	// keep all rotations between 0 and 360.
+	if (xRotation > 360.0) xRotation -= 360.0;
+	if (xRotation < 0.0)   xRotation += 360.0;
+	if (yRotation > 360.0) yRotation -= 360.0;
+	if (yRotation < 0.0)   yRotation += 360.0;
+	// ask for redisplay
+	glutPostRedisplay();
+}
+
+
+void mousePress(int button, int state, int x, int y) {
+	// When left mouse button is pressed, save the mouse(x,y)
+	if ((button == GLUT_LEFT_BUTTON) && (state == GLUT_DOWN)) {
+		mouseX = x;
+		mouseY = y;
+	}
 }
 int i;
 void display()
@@ -227,8 +250,10 @@ void display()
 	glVertex2f(1000, 200);
 	glEnd();
 	*/
-	//glPushMatrix();
-	if (emitter->currentParticles + emitter->particlesPerSec < PARTICLE_NUMBER && emitter->particleSet[emitter->currentParticles - 1]->currentTime >= PARTICLE_LIFE) {
+    glPushMatrix();
+	glRotatef(xRotation, 1.0, 0.0, 0.0);
+	glRotatef(yRotation, 0.0, 1.0, 0.0);
+	if (emitter->particleSet[emitter->currentParticles - 1]->currentTime <= PARTICLE_LIFE && emitter->currentParticles < PARTICLE_NUMBER) {
 		//Particle* particle = (Particle*)malloc(sizeof(Particle));
 		//initParticle(particle);
 		emitter->particleSet[emitter->currentParticles-1]->next = (Particle*)malloc(sizeof(Particle));
@@ -237,7 +262,12 @@ void display()
 		emitter->currentParticles += 1;
 		printf("New Particle Drawn, Now there are %d Particles here! \n", emitter->currentParticles);
 	}
+	else
+	{
+		printf("Current Time of Particle: %d is %f seconds \n", emitter->currentParticles, emitter->particleSet[emitter->currentParticles - 1]->currentTime);
+	}
 	drawParticles();
+	glPopMatrix();
 	glutPostRedisplay();
 }
 
@@ -247,25 +277,23 @@ void keyboard(unsigned char key, int x, int y)
 {
  switch (key)
  {
-    case 27:
-    exit(0);
+	case 27:
+	exit(0);
     break;
-	/*
     case 97:
-    glTranslatef(-2.5f,0,0);
+	eyeX += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 100:
-    //eyeX += MOVEMENT_FACTOR;
-    glTranslatef(2.5f, 0, 0);
+    eyeX -= MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 119:
-    eyeY -= MOVEMENT_FACTOR;
+    eyeY += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 115:
-    eyeY += MOVEMENT_FACTOR;
+    eyeY -= MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
     case 120:
@@ -276,11 +304,16 @@ void keyboard(unsigned char key, int x, int y)
     eyeZ += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
-	*/
-    case 32:
-    initParticle(emitter->particleSet[0]);
+	case 32:
+	{
+		int i;
+		for (i = 0; i < PARTICLE_NUMBER; i++) {
+			initParticle(emitter->particleSet[0]);
+		}
+	}
     break;
  }
+ printf("eye[X,Y,Z] = [%f,%f,%f]", eyeX, eyeY, eyeZ);
   glutPostRedisplay();
 }
 
@@ -320,9 +353,12 @@ void makeAxes() {
 void initGraphics(int argc, char *argv[])
 {
   /*INITIAL NAVIGATIONAL VARIABLES*/
-  eyeX = 50.0;
-  eyeY = -20.0;
-  eyeZ = -700.0;
+  centerX = 120;
+  centerY = 90;
+  centerZ = 45;
+  eyeX = 5.0;
+  eyeY = 2.5;
+  eyeZ = -50.0;
   upX = 0.0;
   upY = 1.0;
   upZ = 0.0;
@@ -333,9 +369,9 @@ void initGraphics(int argc, char *argv[])
   emitter = (Emitter*)malloc(sizeof(Emitter));
   emitter->position = (Coord*)malloc(sizeof(Coord));
   emitter->particlesPerSec = 1;
-  emitter->position->x = 50.0f;
-  emitter->position->y = 50.0f;
-  emitter->position->z = 50.0f;
+  emitter->position->x = 0.0f;
+  emitter->position->y = 0.0f;
+  emitter->position->z = 0.0f;
   /**************************/
   /*INITIAL PARTICLE VARIABLES*/
   /*
@@ -357,6 +393,8 @@ void initGraphics(int argc, char *argv[])
   glutCreateWindow("COMP37111 Particles");
   glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
+  glutMouseFunc(mousePress);
+  glutMotionFunc(mouseMotion);
   glutReshapeFunc(reshape);
   makeAxes();
 }
