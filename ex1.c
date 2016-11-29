@@ -25,10 +25,10 @@
 #define DEG_TO_RAD_CONV 0.017453293f
 #define TIME_STEP .0000001f
 #define MOVEMENT_FACTOR 2.5f;
-#define INITIAL_VELOCITY 7.0f
+#define INITIAL_VELOCITY 1.0f
 #define MAXIMUM_DISTANCE 20.0f
-#define PARTICLE_SIZE 2.0f
-#define PARTICLE_NUMBER 3000
+#define PARTICLE_SIZE 5.0f
+#define PARTICLE_NUMBER 30
 #define PARTICLE_LIFE .001f
 #define EMITTER_NUMBER 3
 #define GRAVITY_CONST -9.81f
@@ -98,26 +98,23 @@ double myRandom()
 
 ///////////////////////////////////////////////
 void calculateNewXPosition(Particle* p, GLfloat dt){
-	/*if (p->currentPos->x > 10.0f) {
-		if (p->velocity->x < 1) { p->velocity->x = 0.1f; }
-		p->velocity->x *= 0.75f;
-	}*/
     p->nextPos->x = p->velocity->x*(dt);
 	p->prevPos->x = p->currentPos->x;
 	p->currentPos->x += p->nextPos->x;
 	p->nextPos->x = 0.0f;
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
-	//if (p->currentPos->y < -10.0f) {
-		//p->velocity->y *= -0.75f;
-	//}
-	if (p->currentPos->y < -10.0) {
-		if (p->velocity->y < 0.1) { p->velocity->y = -0.01f; }
-		p->velocity->y *= .05f;
-		//p->acceleration->y += 0.05;
-
-		//p->velocity->y += 0.1;
-		//glColor3f(p->color->R, p->color->G, p->color->B);
+	if (p->currentPos->y < 0.0) {
+		if (p->velocity->y < 0.1) { p->velocity->y = 0.0f; }
+		if (myRandom() <= 0.1) {
+			p->velocity->y *= .5f;
+			p->acceleration->x += 0.1;
+		}
+		else
+		{
+			p->velocity->y *= -.5f;
+			p->acceleration->z= 0.1;
+		}
 	}
     p->nextPos->y = p->velocity->y + (float)(1/2*(p->acceleration->y)*pow(dt,2));
 	p->prevPos->y = p->currentPos->y;
@@ -125,10 +122,6 @@ void calculateNewYPosition(Particle* p, GLfloat dt){
 	p->nextPos->y = 0.0f;
 }
 void calculateNewZPosition(Particle* p, GLfloat dt){
-	/*if (p->currentPos->z > 10.0f || p->currentPos->z < -10.0f) {
-		if (p->velocity->z < 1) { p->velocity->z = 0.1f; }
-		p->velocity->z *= 0.75f;
-	}*/
 	p->nextPos->z = p->velocity->z*(dt);
 	p->prevPos->z = p->currentPos->z;
 	p->currentPos->z += p->nextPos->z;
@@ -155,7 +148,7 @@ void initParticle(Particle* particle) {
 	particle->currentPos->z = emitter->position->z;
 	particle->velocity->x = 50.75f*myRandom();
 	particle->velocity->y = 0.0f;
-	particle->velocity->z = 15.75f*myRandom();
+	particle->velocity->z = 50.75f*myRandom();
 	particle->acceleration->x = 1.0f;
 	particle->acceleration->y = GRAVITY_CONST;
 	particle->acceleration->z = 1.0f;
@@ -207,7 +200,7 @@ void drawParticles() {
 		if (tmp->currentPos->y > 0) {
 			printf("Current Pos of Particle: %d is [%f,%f,%f] \n", i, tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
 		}
-		if (tmp->color->A > 0) { tmp->color->A *= 0.75;}
+		if (tmp->color->A > 0) { tmp->color->A -= 0.0001;}
 		emitter->particleSet[i] = tmp;
 		tmp = tmp->next;
 		i++;
@@ -313,7 +306,7 @@ void keyboard(unsigned char key, int x, int y)
 	}
     break;
  }
- printf("eye[X,Y,Z] = [%f,%f,%f]", eyeX, eyeY, eyeZ);
+ printf("center[X,Y,Z] = [%f,%f,%f]", centerX, centerY, centerZ);
   glutPostRedisplay();
 }
 
@@ -353,11 +346,11 @@ void makeAxes() {
 void initGraphics(int argc, char *argv[])
 {
   /*INITIAL NAVIGATIONAL VARIABLES*/
-  centerX = 120;
-  centerY = 90;
-  centerZ = 45;
-  eyeX = 5.0;
-  eyeY = 1.5;
+  centerX = 0;
+  centerY = 76;
+  centerZ = 1;
+  eyeX = .5;
+  eyeY = 0.5;
   eyeZ = -50.0;
   upX = 0.0;
   upY = 1.0;
@@ -369,18 +362,10 @@ void initGraphics(int argc, char *argv[])
   emitter = (Emitter*)malloc(sizeof(Emitter));
   emitter->position = (Coord*)malloc(sizeof(Coord));
   emitter->particlesPerSec = 1;
-  emitter->position->x = 1.0f;
-  emitter->position->y = 0.0f;
-  emitter->position->z = 1.0f;
+  emitter->position->x = 0.0f;
+  emitter->position->y = 10.0f;
+  emitter->position->z = 0.0f;
   /**************************/
-  /*INITIAL PARTICLE VARIABLES*/
-  /*
-  for (i = 0; i < 100; i++) {
-	  Particle* particle = (Particle*)malloc(sizeof(Particle));
-	  initParticle(particle);
-	  emitter->particleSet[i] = particle;
-  }
-  */
   Particle* particle = (Particle*)malloc(sizeof(Particle));
   initParticle(particle);
   emitter->particleSet[0] = particle;
@@ -391,6 +376,9 @@ void initGraphics(int argc, char *argv[])
   glutInitWindowPosition(100, 100);
   glutInitDisplayMode(GLUT_DOUBLE);
   glutCreateWindow("COMP37111 Particles");
+  //Enable alpha blending
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_BLEND);
   glutDisplayFunc(display);
   glutKeyboardFunc(keyboard);
   glutMouseFunc(mousePress);
