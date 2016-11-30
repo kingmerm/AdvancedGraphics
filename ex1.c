@@ -23,15 +23,14 @@
 #endif
 
 #define DEG_TO_RAD_CONV 0.017453293f
-#define TIME_STEP .00000001f
-#define MOVEMENT_FACTOR 2.5f;
+#define TIME_STEP .000005f
 #define INITIAL_VELOCITY 1.0f
-#define MAXIMUM_DISTANCE 20.0f
 #define PARTICLE_SIZE 1.0f
-#define PARTICLE_NUMBER 3000000
+#define PARTICLE_NUMBER 30000000
 #define PARTICLE_LIFE .001f
 #define EMITTER_NUMBER 20
-#define GRAVITY_CONST -.25f
+#define GRAVITY_CONST -1.5f
+#define GRASS_GROWTH_RATE 0.00001
 
 // Global viewpoint/camera variables 
 GLfloat latitude, longitude;
@@ -45,7 +44,10 @@ GLuint axisList;
 
 int AXIS_SIZE= 200;
 int axisEnabled= 1;
+//Global Time Variable
+GLfloat currentTime;
 
+GLfloat MOVEMENT_FACTOR = 2.5f;
 typedef struct
 {
 	GLfloat x;
@@ -69,8 +71,9 @@ typedef struct
   Coord* nextPos;
   Coord* velocity;
   Coord* acceleration;
-  GLfloat currentTime;
+  GLfloat particleTime;
   Color* color;
+  GLfloat grassLength;
   struct Particle* next;
 }Particle;
 
@@ -106,16 +109,9 @@ void calculateNewXPosition(Particle* p, GLfloat dt){
 }
 void calculateNewYPosition(Particle* p, GLfloat dt){
 	if (p->currentPos->y < 0.0) {
-		if (p->velocity->y < 0.1) { p->velocity->y = 0.0f; }
-		if (myRandom() >= 0.5) {
-			p->velocity->x *= -1.0f;
-			p->velocity->z *= 1.0f;
-		}
-		else
-		{
-			p->velocity->x *= 1.0f;
-			p->velocity->z *= -1.0f;
-		}
+		if (p->velocity->y < 0.001) { p->velocity->y = 0.0f; }
+		p->velocity->x *= 0.99;
+		p->velocity->z *= 0.99;
 	}
     p->nextPos->y = p->velocity->y + (float)(1/2*(p->acceleration->y)*pow(dt,2));
 	p->prevPos->y = p->currentPos->y;
@@ -130,11 +126,11 @@ void calculateNewZPosition(Particle* p, GLfloat dt){
 }
 void calculateNewXVelocity(Particle* p, GLfloat dt) {
 	p->velocity->x += p->acceleration->x * (dt);
-	if (abs(p->currentPos->y) > 20) {
+	if (p->currentPos->y > .5) {
 		if (myRandom() <= .5)
-			p->velocity->x += 1.8;
+			p->velocity->x += 15.8;
 		else
-			p->velocity->x -= 1.8;
+			p->velocity->x -= 15.8;
 	}
 }
 void calculateNewYVelocity(Particle* p, GLfloat dt) {
@@ -142,11 +138,11 @@ void calculateNewYVelocity(Particle* p, GLfloat dt) {
 }
 void calculateNewZVelocity(Particle* p, GLfloat dt) {
 	p->velocity->z += p->acceleration->z * (dt);
-	if (abs(p->currentPos->y) > 20) {
+	if (p->currentPos->y > .5) {
 		if (myRandom() <= .5)
-			p->velocity->z += 1.8;
+			p->velocity->z += 15.8;
 		else
-			p->velocity->z -= 1.8;
+			p->velocity->z -= 15.8;
 	}
 }
 
@@ -161,29 +157,36 @@ void initParticle(Particle* particle) {
 	particle->currentPos->y =emitter->position->y;
 	particle->currentPos->z =emitter->position->z;
 	if (myRandom() < 0.5) {
-		particle->velocity->x = -100.0f*myRandom();
+		particle->velocity->x = -10.0f*myRandom();
 	}
 	else
 	{
-		particle->velocity->x = 100.0f*myRandom();
+		particle->velocity->x = 10.0f*myRandom();
 	}
-	particle->velocity->y = 0.008*myRandom();
+	particle->velocity->y = 0.008;
 	if (myRandom() < 0.5) {
-		particle->velocity->z = -100.0f*myRandom();
+		particle->velocity->z = -10.0f*myRandom();
 	}
 	else
 	{
-		particle->velocity->z = 100.0f*myRandom();
+		particle->velocity->z = 10.0f*myRandom();
 	}
-	particle->acceleration->x = 3.0f;
+	particle->acceleration->x = .30f;
 	particle->acceleration->y = GRAVITY_CONST;
-	particle->acceleration->z = 3.0f;
-	particle->currentTime = .0f;
+	particle->acceleration->z = .30f;
+	particle->particleTime = .0f;
 	particle->next = NULL;
-	particle->color->R = 0.0f;
-	particle->color->G = (GLdouble)myRandom()*.6f;
-	particle->color->B = (GLdouble)myRandom()*.8f;
+	particle->color->G = (GLdouble)myRandom();
+	particle->color->B = (GLdouble)myRandom();
+	if (particle->color->G == 1.0 && particle->color->B == 1.0) {
+		particle->color->R = 1.0f;
+	}
+	else
+	{
+		particle->color->R = 0.0f;
+	}
 	particle->color->A = 1.0f;
+	particle->grassLength = 0.01f*myRandom();
 }
 ///////////////////////////////////////////////
 void initEmitter(Emitter* emitter) {
@@ -213,12 +216,12 @@ void calculateLookpoint() {
 void calculateNextPositions(Particle* particle){
 	//Particle* particle = emitter->particleSet[0]; //loop through current particles
 	//while (particle != NULL) {
-	calculateNewXVelocity(particle, particle->currentTime - TIME_STEP);
-	calculateNewYVelocity(particle, particle->currentTime - TIME_STEP);
-	calculateNewZVelocity(particle, particle->currentTime - TIME_STEP);
-	calculateNewXPosition(particle, particle->currentTime - TIME_STEP);
-	calculateNewYPosition(particle, particle->currentTime - TIME_STEP);
-	calculateNewZPosition(particle, particle->currentTime - TIME_STEP);
+	calculateNewXVelocity(particle, TIME_STEP);
+	calculateNewYVelocity(particle, TIME_STEP);
+	calculateNewZVelocity(particle, TIME_STEP);
+	calculateNewXPosition(particle, TIME_STEP);
+	calculateNewYPosition(particle, TIME_STEP);
+	calculateNewZPosition(particle, TIME_STEP);
 	//	particle = particle->next;
 	//}
 }
@@ -230,18 +233,40 @@ void drawParticles() {
 		int i = 0;
 		while (tmp != NULL) {
 			calculateNextPositions(tmp);
-			glBegin(GL_POINTS);
-			glColor4f(tmp->color->R, tmp->color->G, tmp->color->B, tmp->color->A);
-			glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
-			glEnd();
-			tmp->currentTime += TIME_STEP;
-			if (tmp->color->A > 0) { 
-					tmp->color->A -= .0002f;
+			if (abs(tmp->velocity->x) > 0.0 && abs(tmp->velocity->z) > 0.0) {
+				glBegin(GL_POINTS);
+				glColor4f(tmp->color->R, tmp->color->G, tmp->color->B, tmp->color->A);
+				glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
+				glEnd();
+				if (tmp->color->A > 0) {
+					tmp->color->A -= .0001f;
+				}
 			}
+			else
+			{
+				glBegin(GL_LINES);
+				glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
+				if (tmp->grassLength > 0.7) {
+					glColor4f(.8, 0.0, 0.0, 0.9);
+				}
+				else
+				{
+					glColor4f(0.0, tmp->color->G, 0.0, 0.75);
+				}
+				
+				glVertex3f(tmp->currentPos->x+0.01*cos(myRandom()), tmp->currentPos->y+tmp->grassLength, tmp->currentPos->z);
+				glEnd();
+				if (tmp->color->A > 0) {
+					//tmp->color->A -= .00000001f;
+				}
+				tmp->grassLength += GRASS_GROWTH_RATE;
+			}
+			tmp->particleTime += TIME_STEP; //need to make particle time variable and global time variable separate
 			emitter->particleSet[i] = tmp;
 			tmp = tmp->next;
 			i++;
 		}
+		currentTime += TIME_STEP;
 		glutSwapBuffers();
 }
 //////////////////////////////////////////////
@@ -269,6 +294,12 @@ void mousePress(int button, int state, int x, int y) {
 int i;
 void display()
 {
+  glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
+  glViewport(0, 0, (GLsizei)800, (GLsizei)600);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluPerspective(60, (GLfloat)800 / (GLfloat)600, 1.0, 10000.0);
+  glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   glRotatef(xRotation, 1.0, 0.0, 0.0);
   glRotatef(yRotation, 0.0, 1.0, 0.0);
@@ -281,10 +312,15 @@ void display()
   glClear(GL_COLOR_BUFFER_BIT);
   // If enabled, draw coordinate axis
   if(axisEnabled) glCallList(axisList);
-	  glBegin(GL_POINTS);
-	  glVertex3f(emitter->position->x,emitter->position->y,emitter->position->z);
+  //0.52 green 0.37 blue 0.26
+	  glBegin(GL_QUADS);
+	  glColor3f(0.52f, 0.37f, 0.26f);
+	  glVertex3f(-100.0, 0.0 ,-100.0);
+	  glVertex3f(-100.0, 0.0, 100.0);
+	  glVertex3f(100.0, 0.0, 100.0);
+	  glVertex3f(100.0, 0.0, -100.0);
 	  glEnd();
-	  if (emitter->particleSet[emitter->currentParticles - 1]->currentTime <= PARTICLE_LIFE && emitter->currentParticles < PARTICLE_NUMBER) {
+	  if (emitter->particleSet[emitter->currentParticles - 1]->particleTime <= PARTICLE_LIFE && emitter->currentParticles < PARTICLE_NUMBER) {
 		  //Add new particle
 		 emitter->particleSet[emitter->currentParticles - 1]->next = (Particle*)malloc(sizeof(Particle));
 		  //initialise new particle
@@ -298,7 +334,7 @@ void display()
 }
 
 ///////////////////////////////////////////////
-
+int refreshingEmitter;
 void keyboard(unsigned char key, int x, int y)
 {
  switch (key)
@@ -318,9 +354,12 @@ void keyboard(unsigned char key, int x, int y)
     eyeY += MOVEMENT_FACTOR;
     calculateLookpoint();
     break;
-    case 115:
-    eyeY -= MOVEMENT_FACTOR;
-    calculateLookpoint();
+	case 115: {
+		if (eyeY >= MOVEMENT_FACTOR) {
+			eyeY -= MOVEMENT_FACTOR;
+		}
+		calculateLookpoint();
+	}
     break;
     case 120:
     eyeZ -= MOVEMENT_FACTOR;
