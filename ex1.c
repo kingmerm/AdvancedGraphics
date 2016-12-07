@@ -26,6 +26,7 @@
 #define DEG_TO_RAD_CONV 0.017453293f
 #define PARTICLE_NUMBER 1000000
 #define PARTICLE_LIFE .00001f
+#define DAY_TIME 24
 #define EMITTER_NUMBER 20
 #define GRASS_GROWTH_RATE 0.0001
 #define MAXIMUM_GRASS_HEIGHT 2.0
@@ -46,16 +47,20 @@ int axisEnabled= 1;
 GLfloat currentTime;
 
 GLfloat MOVEMENT_FACTOR = 2.5f;
-GLfloat TIME_STEP = .000005f;
+GLfloat TIME_STEP = 0.001f;
 GLfloat GRAVITY_CONST = -2.0f;
 GLfloat PARTICLE_SIZE = 1.0f;
+
 static int rootMenuId;
-static int subAxisMenuId;
-static int subTerrainMenuId;
+static int axisSubMenuId;
+static int terrainSubMenuId;
 static int gravitySubMenuId;
 static int emitterPositionSubMenuId;
 static int fountainSubMenuId;
 static int particleSizeSubMenuId;
+static int seasonalSubMenuId;
+static int seasonalMenuEnabled = 0;
+static int terrainMenuEnabled = 1;
 static int window;
 static int menuOpen = 0;
 static int val = 0;
@@ -101,10 +106,11 @@ typedef struct
 Emitter* emitter;
 typedef struct
 {
-	Emitter* emitterSet[EMITTER_NUMBER];
-}ParticleSystem;
+	Color* color;
+	GLfloat currentTimeOfDay;
+}Sky;
 
-ParticleSystem *pSystem;
+Sky* sky;
 ///////////////////////////////////////////////
 
 double myRandom()
@@ -139,24 +145,12 @@ void calculateNewZPosition(Particle* p, GLfloat dt){
 }
 void calculateNewXVelocity(Particle* p, GLfloat dt) {
 	p->velocity->x += p->acceleration->x * (dt);
-	if (p->currentPos->y > .5) {
-		if (myRandom() <= .5)
-			p->velocity->x += 15.8;
-		else
-			p->velocity->x -= 15.8;
-	}
 }
 void calculateNewYVelocity(Particle* p, GLfloat dt) {
 	p->velocity->y += p->acceleration->y * (dt);
 }
 void calculateNewZVelocity(Particle* p, GLfloat dt) {
 	p->velocity->z += p->acceleration->z * (dt);
-	if (p->currentPos->y > .5) {
-		if (myRandom() <= .5)
-			p->velocity->z += 15.8;
-		else
-			p->velocity->z -= 15.8;
-	}
 }
 
 void initParticle(Particle* particle) {
@@ -170,19 +164,19 @@ void initParticle(Particle* particle) {
 	particle->currentPos->y =emitter->position->y;
 	particle->currentPos->z =emitter->position->z;
 	if (myRandom() < 0.5) {
-		particle->velocity->x = -4.0f*myRandom();
+		particle->velocity->x = -40.0f*myRandom();
 	}
 	else
 	{
-		particle->velocity->x = 4.0f*myRandom();
+		particle->velocity->x = 40.0f*myRandom();
 	}
-	particle->velocity->y = 0.025;
+	particle->velocity->y = 0.2;
 	if (myRandom() < 0.5) {
-		particle->velocity->z = -4.0f*myRandom();
+		particle->velocity->z = -40.0f*myRandom();
 	}
 	else
 	{
-		particle->velocity->z = 4.0f*myRandom();
+		particle->velocity->z = 40.0f*myRandom();
 	}
 	particle->acceleration->x = 3.0f;
 	particle->acceleration->y = GRAVITY_CONST;
@@ -190,9 +184,10 @@ void initParticle(Particle* particle) {
 	particle->particleTime = .0f;
 	particle->next = NULL;
 	particle->color->G = 0.0f;
-	particle->color->B = myRandom()*2.0;
+	particle->color->B = myRandom();
 	particle->color->R = 0.0f;
-	if (particle->color->B == 1.0) {
+	if (myRandom() < 0.3) {
+		particle->color->B = 1.0f;
 		particle->color->R = 1.0f;
 		particle->color->G = 1.0f;
 	}
@@ -251,13 +246,13 @@ void drawParticles() {
 				glColor4f(tmp->color->R, tmp->color->G, tmp->color->B, tmp->color->A);
 				glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
 				glEnd();
-				if (tmp->particleTime > PARTICLE_LIFE && tmp->color->A > 0) {
+				if (tmp->color->A > 0) {
 					tmp->color->A -= .0001f;
 				}
 			}
 			else
 			{
-				if (abs(tmp->currentPos->x) < 5 && abs(tmp->currentPos->z) < 5)
+				if (abs(tmp->currentPos->x - emitter->position->x) < 5 && abs(tmp->currentPos->z - emitter->position->z) < 5)
 				{
 					glBegin(GL_POINTS);
 					glColor4f(1.0, 1.0, tmp->color->B, tmp->color->A);
@@ -272,14 +267,38 @@ void drawParticles() {
 					glBegin(GL_LINES);
 					glVertex3f(tmp->currentPos->x, tmp->currentPos->y, tmp->currentPos->z);
 					if (tmp->grassLength > 0.2 && tmp->chanceOfFlowering < 0.1) {
-						glColor4f(.8, tmp->grassColor, 0.0, 0.9);
+						if (seasonalMenuEnabled) {
+							if (val == 18/*SPRING*/) { glColor4f(0.1, 0.7, 0.05, 1.0); }
+							if (val == 19/*SUMMER*/) { glColor4f(0.8, 0.9, 0.0, 0.9); }
+							if (val == 20/*AUTUMN*/) { glColor4f(0.8, 0.6, 0.0, 0.9); }
+							if (val == 21/*WINTER*/) { glColor4f(1.0, 1.0, 1.0, 0.6); }
+						}
+						else{ glColor4f(0.1, tmp->grassColor, 0.05, 1.0); }
 					}
 					else
 					{
-						glColor4f(0.0, tmp->grassColor, 0.0, 0.6);
+						if (seasonalMenuEnabled) {
+							if (val == 18/*SPRING*/) { glColor4f(0.0, 0.95, 0.0, 1.0); }
+							if (val == 19/*SUMMER*/) { glColor4f(0.0, tmp->grassColor, 0.0, 1.0); }
+							if (val == 20/*AUTUMN*/) { glColor4f(0.4, tmp->grassColor, 0.0, 0.7); }
+							if (val == 21/*WINTER*/) {
+								if (tmp->chanceOfFlowering < .1) {
+									glColor4f(.9, 1.0, .9, 0.3);
+								}
+								else
+								{
+									glColor4f(0.0, 0.4, 0.0, 0.01);
+								}
+
+							}
+						}
+						else
+						{
+							glColor4f(0.0, tmp->grassColor, 0.0, 1.0);
+						}
 					}
 
-					glVertex3f(tmp->currentPos->x + 0.01*cos(myRandom()), tmp->currentPos->y + tmp->grassLength, tmp->currentPos->z);
+					glVertex3f(tmp->currentPos->x + 0.01*cos(tmp->chanceOfFlowering), tmp->currentPos->y + tmp->grassLength, tmp->currentPos->z);
 					glEnd();
 					if (tmp->grassLength < MAXIMUM_GRASS_HEIGHT)
 						tmp->grassLength += GRASS_GROWTH_RATE;
@@ -334,8 +353,25 @@ void display()
             centerX, centerY, centerZ,
             upX, upY, upZ);
   // Clear the screen
+  if ((int)sky->currentTimeOfDay % (DAY_TIME) == 0) {
+	sky->color->R -= 2.0*TIME_STEP;
+	sky->color->G -= 2.0*TIME_STEP;
+	sky->color->B -= TIME_STEP;
+  }
+  else
+  {
+	sky->color->R += 2.0*TIME_STEP;
+	sky->color->G += 2.0*TIME_STEP;
+	sky->color->B += TIME_STEP;
+	if (sky->color->R > 0.9 && sky->color->G > 0.9 && sky->color->B > 0.8)
+	{
+		sky->currentTimeOfDay = 0.0;
+	}
+  }
+  sky->currentTimeOfDay += TIME_STEP;
+  glClearColor(sky->color->R, sky->color->G, sky->color->B, 1.0);
   glClear(GL_COLOR_BUFFER_BIT);
-  if (val != 5) {
+  if (terrainMenuEnabled) {
 	  glBegin(GL_QUADS);
 	  glColor3f(0.52f, 0.37f, 0.26f);
 	  glVertex3f(-100.0, 0.0, -100.0);
@@ -345,13 +381,13 @@ void display()
 	  glEnd();
 	  glBegin(GL_QUADS);
 	  glColor4f(0.0, .16f, 0.8f, .4f);
-	  glVertex3f(-5.0, 0.0, -5.0);
+	  glVertex3f(emitter->position->x-5.0, 0.0, emitter->position->z -5.0);
 	  glColor4f(0.0, .16f, .5f, .8f);
-	  glVertex3f(-5.0, 0.0, 5.0);
+	  glVertex3f(emitter->position->x - 5.0, 0.0, emitter->position->z + 5.0);
 	  glColor4f(0.0, 0.0, .70f, .4f);
-	  glVertex3f(5.0, 0.0, 5.0);
+	  glVertex3f(emitter->position->x + 5.0, 0.0, emitter->position->z + 5.0);
 	  glColor4f(1.0f, 1.0f, 1.0f, .8f);
-	  glVertex3f(5.0, 0.0, -5.0);
+	  glVertex3f(emitter->position->x + 5.0, 0.0, emitter->position->z - 5.0);
 	  glEnd();
   }
   //check to see if fountain is on
@@ -393,7 +429,7 @@ void keyboard(unsigned char key, int x, int y)
     calculateLookpoint();
     break;
 	case 115: {
-		if (eyeY >= MOVEMENT_FACTOR) {
+		if (eyeY > 1.5*MOVEMENT_FACTOR) {
 			eyeY -= MOVEMENT_FACTOR;
 		}
 		calculateLookpoint();
@@ -473,6 +509,20 @@ void menu(int value) {
 		printf("AXIS REMOVED \n");
 		break;
 	}
+	case 4:
+	{
+		terrainMenuEnabled = 1;
+		glutPostRedisplay();
+		printf("TERRAIN SHOWING\n");
+		break;
+	}
+	case 5:
+	{
+		terrainMenuEnabled = 1;
+		glutPostRedisplay();
+		printf("TERRAIN REMOVED\n");
+		break;
+	}
 	case 6: {
 		GRAVITY_CONST *= 0.25f;
 		glutPostRedisplay();
@@ -508,7 +558,6 @@ void menu(int value) {
 	{
 		initEmitter(emitter);
 		emitter->position->x = 10.0f*myRandom();
-		emitter->position->y = 10.0f*myRandom();
 		emitter->position->z = 10.0f*myRandom();
 		initParticle(emitter->particleSet[0]);
 		glutPostRedisplay();
@@ -542,6 +591,46 @@ void menu(int value) {
 		printf("PARTICLE SIZE IS: %f \n", PARTICLE_SIZE);
 		break;
 	}
+	case 18: 
+	{	
+		seasonalMenuEnabled = 1;
+		val = 18;
+		glutPostRedisplay();
+		printf("SEASON: SPRING\n");
+		break;
+	}
+	case 19:
+	{
+		seasonalMenuEnabled = 1;
+		val = 19;
+		glutPostRedisplay();
+		printf("SEASON: SUMMER\n");
+		break;
+	}
+	case 20: 
+	{
+		seasonalMenuEnabled = 1; 
+		val = 20;
+		glutPostRedisplay();
+		printf("SEASON: AUTUMN\n");
+		break;
+	}
+	case 21:
+	{
+		seasonalMenuEnabled = 1;
+		val = 21;
+		glutPostRedisplay();
+		printf("SEASON: WINTER\n");
+		break;
+	}
+	case 22:
+	{
+		seasonalMenuEnabled = 0;
+		val = 22;
+		glutPostRedisplay();
+		printf("SEASON: DEFAULT\n");
+		break;
+	}
 	default:
 	{
 		val = value;
@@ -551,10 +640,10 @@ void menu(int value) {
 	}
 }
 void createMenu(void) {
-	subAxisMenuId = glutCreateMenu(menu);
+	axisSubMenuId = glutCreateMenu(menu);
 	glutAddMenuEntry("Show", 2);
 	glutAddMenuEntry("Remove", 3);
-	subTerrainMenuId = glutCreateMenu(menu);
+	terrainSubMenuId = glutCreateMenu(menu);
 	glutAddMenuEntry("Show", 4);
 	glutAddMenuEntry("Remove", 5);
 	gravitySubMenuId = glutCreateMenu(menu);
@@ -573,14 +662,21 @@ void createMenu(void) {
 	glutAddMenuEntry("Small", 15);
 	glutAddMenuEntry("Medium", 16);
 	glutAddMenuEntry("Large", 17);
+	seasonalSubMenuId = glutCreateMenu(menu);
+	glutAddMenuEntry("Spring", 18);
+	glutAddMenuEntry("Summer", 19);
+	glutAddMenuEntry("Autumn", 20);
+	glutAddMenuEntry("Winter", 21);
+	glutAddMenuEntry("DEFAULT", 22);
 	rootMenuId = glutCreateMenu(menu);
 	glutAddMenuEntry("QUIT", 0);
-	glutAddSubMenu("Axis", subAxisMenuId);
+	glutAddSubMenu("Axis", axisSubMenuId);
 	glutAddSubMenu("Fountain", fountainSubMenuId);
-	glutAddSubMenu("Ground & Water", subTerrainMenuId);
+	glutAddSubMenu("Ground & Water", terrainSubMenuId);
 	glutAddSubMenu("Gravity", gravitySubMenuId);
 	glutAddSubMenu("Move Emitter", emitterPositionSubMenuId);
 	glutAddSubMenu("Particle Size", particleSizeSubMenuId);
+	glutAddSubMenu("Season", seasonalSubMenuId);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 }
 void initGraphics(int argc, char *argv[])
@@ -590,7 +686,7 @@ void initGraphics(int argc, char *argv[])
   centerY = 76;
   centerZ = 1;
   eyeX = .5;
-  eyeY = 0.5;
+  eyeY = 2.5;
   eyeZ = -50.0;
   upX = 0.0;
   upY = 1.0;
@@ -598,32 +694,17 @@ void initGraphics(int argc, char *argv[])
   latitude = 0.0;
   longitude = 0.0;
   /******************************/
- pSystem = (ParticleSystem*)malloc(sizeof(ParticleSystem));
   /*INITIAL EMITTER VARIABLES*/
- emitter = (Emitter*)malloc(sizeof(Emitter));
- initEmitter(emitter);
- initParticle(emitter->particleSet[0]);
- // int i;
-  /*
-  for (i = 0; i < EMITTER_NUMBER; i++) {
-	  Emitter* emitter = (Emitter*)malloc(sizeof(Emitter));
-	  emitter->position = (Coord*)malloc(sizeof(Coord));
-	  emitter->particlesPerSec = 1;
-	  emitter->position->x = 100 * myRandom();
-	  emitter->position->y = 100 * myRandom();
-	  emitter->position->z = 100 * myRandom();
-	  pSystem->emitterSet[i] = emitter;
-  }*/
-  /**************************/
-  /*
-  for (i = 0; i < EMITTER_NUMBER; i++) {
-	  Particle* particle = (Particle*)malloc(sizeof(Particle));
-	  initParticle(particle);
-	 emitter->particleSet[0] = particle;
-	 emitter->currentParticles = 1;
-  }
-  */
-  /****************************/
+  emitter = (Emitter*)malloc(sizeof(Emitter));
+  initEmitter(emitter);
+  initParticle(emitter->particleSet[0]);
+  /*INITAL SKY VARIABLES*/
+  sky = (Sky*)malloc(sizeof(Sky));
+  sky->color = (Color*)malloc(sizeof(Color));
+  sky->color->R = 0.980392;
+  sky->color->G = 0.980392;
+  sky->color->B = 0.823529;
+  sky->currentTimeOfDay = 0.0f;
   glutInit(&argc, argv);
   glutInitWindowSize(800, 600);
   glutInitWindowPosition(100, 100);
